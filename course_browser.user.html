@@ -1,0 +1,528 @@
+<style>
+    :root {
+        --bg-main: #ffffff;
+        --bg-card: #ffffff;
+        --bg-header: #f8f9fa;
+        --bg-header-hover: #e9ecef;
+        --text-main: #000000;
+        --text-muted: #6c757d;
+        --border-color: #dee2e6;
+        --tag-bg: #e3f2fd;
+        --tag-color: #0d47a1;
+        --match-bg: rgba(255, 235, 59, 0.6); /* light yellow */
+        --match-glow: rgba(255, 235, 59, 0.25);
+    }
+
+    [data-theme="dark"] {
+        --bg-main: #121212;
+        --bg-card: #1e1e1e;
+        --bg-header: #2d2d2d;
+        --bg-header-hover: #3d3d3d;
+        --text-main: #ffffff;
+        --text-muted: #adb5bd;
+        --border-color: #404040;
+        --tag-bg: #0d47a1;
+        --tag-color: #e3f2fd;
+        --input-bg: #2d2d2d;
+        --input-text: #ffffff;
+        --input-border: #404040;
+        --match-bg: rgba(255, 200, 50, 0.15); /* subtler for dark */
+        --match-glow: rgba(255, 200, 50, 0.12);
+    }
+
+    body {
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .course-card {
+        margin-bottom: 1rem;
+        background-color: var(--bg-card);
+        border-color: var(--border-color);
+    }
+
+    .dept-section {
+        margin-bottom: 2rem;
+    }
+
+    .professor-tag {
+        display: inline-block;
+        margin: 0.2rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.6rem;
+        background-color: transparent; /* outlined style */
+        color: var(--tag-color);
+        border: 1px solid var(--tag-bg); /* use the same blue the tags used to be filled with */
+        transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    /* Slight fill on hover to indicate interactiveness */
+    .professor-tag:hover {
+        /* subtle tint on hover using the tag color */
+        background-color: rgba(13, 71, 161, 0.06);
+    }
+
+    /* Use the same search-match wrapper inside tags so matched substrings are highlighted */
+    .professor-tag .search-match,
+    .search-match {
+        background-color: var(--match-bg);
+        padding: 0 0.12rem;
+        border-radius: 0.2rem;
+        font-weight: 600;
+        display: inline-block;
+        line-height: 1;
+        animation: highlightPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes highlightPulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(0,0,0,0);
+            transform: translateZ(0);
+        }
+        50% {
+            box-shadow: 0 0 12px 6px var(--match-glow);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(0,0,0,0);
+            transform: translateZ(0);
+        }
+    }
+
+    .dept-header {
+        background-color: var(--bg-header);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        user-select: none;
+        color: var(--text-main);
+        transition: opacity 0.3s ease, background-color 0.3s ease;
+    }
+
+    .dept-header:hover {
+        background-color: var(--bg-header-hover);
+    }
+
+    .dept-header.empty {
+        opacity: 0.5;
+    }
+
+    .dept-header.empty:hover {
+        opacity: 0.7;
+    }
+
+    .dept-header .toggle-icon {
+        transition: transform 0.3s ease;
+    }
+
+    .dept-header .toggle-icon.collapsed {
+        transform: rotate(-90deg);
+    }
+
+    #controls {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background-color: var(--bg-main);
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    .mode-icon {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+
+    [data-theme="dark"] .form-control {
+        background-color: var(--input-bg);
+        border-color: var(--input-border);
+        color: var(--input-text);
+    }
+
+    [data-theme="dark"] .form-control:focus {
+        background-color: var(--input-bg);
+        border-color: var(--primary);
+        color: var(--input-text);
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    [data-theme="dark"] .form-control::placeholder {
+        color: var(--text-muted);
+    }
+</style>
+
+<div class="container my-3">
+    <div id="controls" class="row mb-4">
+        <div class="col-md-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="showNoProfs">
+                <label class="form-check-label" for="showNoProfs">
+                    <i class="fas fa-users-slash"></i>
+                </label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <input type="text" class="form-control" id="profSearch" placeholder="Search">
+                <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="form-check form-switch d-none -d-inline-block">
+                <input class="form-check-input" type="checkbox" id="darkMode">
+                <label class="form-check-label" for="darkMode">
+                    <i class="fas fa-sun mode-icon"></i>
+                </label>
+            </div>
+            <button class="btn btn-outline-primary" type="button" onclick="BBN.closeBrowser()">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+    <div class="container mb-4 d-flex">
+        <div class="flex-grow-1">
+            <button class="btn btn-sm btn-outline-primary" id="refresh-courses" onclick="BBN.refreshCourses()">Refresh</button>
+            <span class="text-muted pl-4" id="courses-status"></span>
+        </div>
+        <div id="term"></div>
+    </div>
+    <div id="courseContainer">
+        <!-- Departments and courses will be inserted here -->
+    </div>
+</div>
+
+<script>
+    let coursesData = [];
+    let currentProfSearch = '';
+    const courseContainer = document.getElementById('courseContainer');
+    const showNoProfsToggle = document.getElementById('showNoProfs');
+    const darkModeToggle = document.getElementById('darkMode');
+    const profSearchInput = document.getElementById('profSearch');
+    const clearSearchBtn = document.getElementById('clearSearch');
+
+    // Cookie management
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/`;
+    }
+
+    function getCookie(name) {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [cookieName, cookieValue] = cookie.split('=').map(c => c.trim());
+            if (cookieName === name) return cookieValue;
+        }
+        return null;
+    }
+
+    // Dark mode management
+    function initializeTheme() {
+        const storedTheme = getCookie('theme');
+        if (storedTheme) {
+            setTheme(storedTheme === 'dark');
+        } else {
+            // Use system preference if no cookie
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setTheme(prefersDark);
+        }
+    }
+
+    function setTheme(isDark) {
+        // TODO: document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        darkModeToggle.checked = isDark;
+        darkModeToggle.nextElementSibling.querySelector('i').className = 
+            `fas ${isDark ? 'fa-moon' : 'fa-sun'} mode-icon`;
+        setCookie('theme', isDark ? 'dark' : 'light', 365);
+    }
+
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (!getCookie('theme')) { // Only auto-switch if user hasn't set preference
+            setTheme(e.matches);
+        }
+    });
+
+    darkModeToggle.addEventListener('change', (e) => {
+        setTheme(e.target.checked);
+    });
+
+    // Load and process the course data
+    async function loadCourses() {
+        BBN.log('Loading courses...');
+        try {
+            document.getElementById('term').innerText = BBN.term.name;
+            coursesData = await BBN.GM.getValue('courses', []);
+            document.getElementById('courses-status').innerText = await BBN.refreshedCoursesAt();
+            displayCourses(false);
+        } catch (error) {
+            console.error('Error loading courses:', error);
+            courseContainer.innerHTML = '<div class="alert alert-danger">Error loading course data</div>';
+        }
+    }
+
+    // Group courses by department and display them
+    function shouldShowCourse(course) {
+        const hasProfs = course.professors && course.professors.length > 0;
+        if (!currentProfSearch) {
+            return showNoProfsToggle.checked || hasProfs;
+        }
+
+        const q = currentProfSearch.toLowerCase();
+        const profMatch = hasProfs && course.professors.some(prof => prof.toLowerCase().includes(q));
+        const titleMatch = course.title && course.title.toLowerCase().includes(q);
+        const codeMatch = course.cd && course.cd.toLowerCase().includes(q);
+
+        const matchesSearch = profMatch || titleMatch || codeMatch;
+        return (showNoProfsToggle.checked || hasProfs) && matchesSearch;
+    }
+
+    function displayCourses(expandAll) {
+        // First, destroy any existing collapses
+        document.querySelectorAll('.courses-list.collapse').forEach(el => {
+            const collapse = new mdb.Collapse(el, { toggle: false });
+            collapse.dispose();
+        });
+
+        // Group by department
+        const deptGroups = coursesData.reduce((groups, course) => {
+            const dept = course.dept || 'Unknown Department';
+            if (!groups[dept]) {
+                groups[dept] = [];
+            }
+            groups[dept].push(course);
+            return groups;
+        }, {});
+
+        // Clear container
+        courseContainer.innerHTML = '';
+
+        // Sort departments by visible course count (descending)
+        Object.keys(deptGroups)
+            .sort((a, b) => {
+                const aVisibleCount = deptGroups[a].filter(shouldShowCourse).length;
+                const bVisibleCount = deptGroups[b].filter(shouldShowCourse).length;
+                return bVisibleCount - aVisibleCount || a.localeCompare(b); // Secondary sort by name
+            })
+            .forEach(dept => {
+                const courses = deptGroups[dept];
+                const deptElement = createDepartmentSection(dept, courses, expandAll);
+                courseContainer.appendChild(deptElement);
+            });
+
+        // After all sections are created, handle expansion
+        if (expandAll) {
+            setTimeout(() => toggleAllSections(true), 0);
+        }
+    }
+
+    // Create a section for a department and its courses
+    function createDepartmentSection(dept, courses, expandAll) {
+        const section = document.createElement('div');
+        section.className = 'dept-section';
+
+        const header = document.createElement('div');
+        const visibleCourses = courses.filter(shouldShowCourse);
+        const headerClasses = ['dept-header', 'd-flex', 'align-items-center'];
+        if (visibleCourses.length === 0) {
+            headerClasses.push('empty');
+        }
+        header.className = headerClasses.join(' ');
+        const targetId = `dept-${dept.replace(/\W+/g, '-')}`;
+        header.setAttribute('data-mdb-toggle', 'collapse');
+        header.setAttribute('data-mdb-target', `#${targetId}`);
+        header.setAttribute('role', 'button');
+        header.setAttribute('aria-expanded', 'false');
+
+        const totalCourses = courses.length;
+        const hiddenCourses = totalCourses - visibleCourses.length;
+        const countText = hiddenCourses > 0 
+            ? `${visibleCourses.length} courses, ${hiddenCourses} hidden`
+            : `${visibleCourses.length} courses`;
+
+        header.innerHTML = `
+            <i class="fas fa-chevron-down me-2 toggle-icon collapsed"></i>
+            <div>
+                <h2 class="h4 mb-0">${cleanDepartmentTitle(dept)}</h2>
+                <small class="text-muted"><span class="course-count">${countText}</span></small>
+            </div>
+        `;
+        section.appendChild(header);
+
+        const coursesList = document.createElement('div');
+        coursesList.className = 'courses-list collapse';
+        coursesList.id = targetId;
+
+        // Initialize collapse but don't trigger it yet
+        // (we'll handle this in toggleAllSections if needed)
+
+        visibleCourses.forEach(course => {
+            coursesList.appendChild(createCourseCard(course));
+        });
+
+        section.appendChild(coursesList);
+        return section;
+    }
+
+    // Clean department title by removing 'O' prefix if followed by capital letter
+    function cleanDepartmentTitle(title) {
+        return title.replace(/^O([A-Z][a-z])/, '$1');
+    }
+
+    // Escape user input for safely building a regex
+    function escapeRegExp(string) {
+        return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Create a card for a single course
+    function createCourseCard(course) {
+        const card = document.createElement('div');
+        card.className = 'card course-card';
+        
+        let professors = '<em class="text-muted">No professors listed</em>';
+        if (course.professors && course.professors.length > 0) {
+            if (currentProfSearch) {
+                try {
+                    const q = escapeRegExp(currentProfSearch);
+                    const re = new RegExp(q, 'gi');
+                    professors = course.professors.map(prof => {
+                        const profHighlighted = prof.replace(re, match => `<span class="search-match">${match}</span>`);
+                        return `<span class="professor-tag">${profHighlighted}</span>`;
+                    }).join('');
+                } catch (e) {
+                    // fallback to plain rendering if regex fails
+                    professors = course.professors.map(prof => `<span class="professor-tag">${prof}</span>`).join('');
+                }
+            } else {
+                professors = course.professors.map(prof => `<span class="professor-tag">${prof}</span>`).join('');
+            }
+        }
+
+        // Highlight matches in title and code
+        let displayTitle = course.title || '';
+        let displayCode = course.cd || '';
+        if (currentProfSearch) {
+            try {
+                const q = escapeRegExp(currentProfSearch);
+                const re = new RegExp(q, 'gi');
+                displayTitle = displayTitle.replace(re, match => `<span class="search-match">${match}</span>`);
+                displayCode = displayCode.replace(re, match => `<span class="search-match">${match}</span>`);
+            } catch (e) {
+                // If regex fails for any reason, fall back to raw values
+                console.warn('Regex error when highlighting search matches:', e);
+            }
+        }
+
+        card.innerHTML = `
+            <div class="card-body">
+                <h5 class="card-title">${displayCode} - ${displayTitle}</h5>
+                <p class="card-text">${course.desc || 'No description available'}</p>
+                <div class="professors mt-2">
+                    ${professors}
+                </div>
+            </div>
+        `;
+        return card;
+    }
+
+    // Handle toggle for showing courses without professors
+    showNoProfsToggle.addEventListener('change', () => {
+        displayCourses(currentProfSearch !== '');
+    });
+
+    // Helper function to expand/collapse all sections
+    function toggleAllSections(expand) {
+        document.querySelectorAll('.dept-section').forEach(section => {
+            const collapseEl = section.querySelector('.courses-list.collapse');
+            const icon = section.querySelector('.toggle-icon');
+            const collapse = new mdb.Collapse(collapseEl, { toggle: false });
+            
+            if (expand) {
+                collapse.show();
+                icon.classList.remove('collapsed');
+            } else {
+                collapse.hide();
+                icon.classList.add('collapsed');
+            }
+        });
+    }
+
+    // Handle showing/hiding courses in a section
+    function updateSection(section) {
+        document.querySelectorAll('.dept-section').forEach(section => {
+            const courses = coursesData.filter(course => course.dept === section.querySelector('h2').textContent);
+            const visibleCourses = courses.filter(shouldShowCourse);
+            
+            // Update course count
+            const totalCourses = courses.length;
+            const hiddenCourses = totalCourses - visibleCourses.length;
+            const countText = hiddenCourses > 0 
+                ? `${visibleCourses.length} courses, ${hiddenCourses} hidden`
+                : `${visibleCourses.length} courses`;
+            section.querySelector('.course-count').textContent = countText;
+
+            // Update header appearance based on visible courses
+            const header = section.querySelector('.dept-header');
+            if (visibleCourses.length === 0) {
+                header.classList.add('empty');
+            } else {
+                header.classList.remove('empty');
+            }
+            
+            // Update header empty state
+            const deptHeader = section.querySelector('.dept-header');
+            if (visibleCourses.length === 0) {
+                deptHeader.classList.add('empty');
+            } else {
+                deptHeader.classList.remove('empty');
+            }
+
+            // Update visible courses
+            const coursesList = section.querySelector('.courses-list');
+            coursesList.innerHTML = '';
+            visibleCourses.forEach(course => {
+                coursesList.appendChild(createCourseCard(course));
+            });
+        });
+    }
+
+    // Handle collapse events to rotate chevron
+    document.addEventListener('shown.bs.collapse', (e) => {
+        if (e.target.classList.contains('courses-list')) {
+            const header = e.target.closest('.dept-section').querySelector('.toggle-icon');
+            header.classList.remove('collapsed');
+        }
+    });
+    
+    document.addEventListener('hidden.bs.collapse', (e) => {
+        if (e.target.classList.contains('courses-list')) {
+            const header = e.target.closest('.dept-section').querySelector('.toggle-icon');
+            header.classList.add('collapsed');
+        }
+    });
+
+    // Handle professor name search
+    function handleProfSearch() {
+        currentProfSearch = profSearchInput.value.trim();
+        displayCourses(currentProfSearch !== '');
+    }
+
+    // Set up search handlers
+    profSearchInput.addEventListener('input', handleProfSearch);
+    clearSearchBtn.addEventListener('click', () => {
+        profSearchInput.value = '';
+        handleProfSearch();
+    });
+
+    // Initialize theme and load courses
+    initializeTheme();
+    loadCourses();
+</script>
