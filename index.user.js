@@ -19,6 +19,7 @@ const THROTTLE_REQUESTS = 2000;
 
 const BBN = {
     GM: GM,
+    domain: unsafeWindow.location.host,
     log: (...data) => {
         GM.log('[BBN]', ...data);
     },
@@ -29,7 +30,7 @@ const BBN = {
         await BBN.exists('app-header nav hi-link');
 
         BBN.log('Retrieving data...');
-        const terms = JSON.parse(await BBN.fetch('https://pvcc.navigate.eab.com/api/v1/cat/terms/'));
+        const terms = JSON.parse(await BBN.fetch(`https://${BBN.domain}/api/v1/cat/terms/`));
         const now = Date.now();
         BBN.term = terms.data
             .filter(t => !isNaN(new Date(t.term_start_dt).getTime()))
@@ -106,14 +107,14 @@ const BBN = {
         button.setAttribute('disabled', true);
 
         status.innerText = 'downloading courses...';
-        const courses = JSON.parse(await BBN.fetch(`https://pvcc.navigate.eab.com/api/v1/cat/course_search/?term=${BBN.term.id}&only_available=false&offset=0&limit=1000`));
+        const courses = JSON.parse(await BBN.fetch(`https://${BBN.domain}/api/v1/cat/course_search/?term=${BBN.term.id}&only_available=false&offset=0&limit=1000`));
         
         status.innerText = 'downloading professors...';
         let current = 1;
         for (const course of courses.data) {
             status.innerText = `downloading professors... ${current++}/${courses.data.length}`;
             course.professors = [];
-            const response = await BBN.fetch(`https://pvcc.navigate.eab.com/api/v1/cat/sections/term/${BBN.term.id}/course/${course.id}/section_type/0/`);
+            const response = await BBN.fetch(`https://${BBN.domain}/api/v1/cat/sections/term/${BBN.term.id}/course/${course.id}/section_type/0/`);
             const sections = JSON.parse(response).section;
             for (const section of Object.values(sections)) {
                 if (!course.professors.includes(section.instructor_name))
