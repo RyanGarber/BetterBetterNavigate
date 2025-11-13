@@ -13,23 +13,6 @@
         --match-glow: rgba(255, 235, 59, 0.25);
     }
 
-    [data-theme="dark"] {
-        --bg-main: #121212;
-        --bg-card: #1e1e1e;
-        --bg-header: #2d2d2d;
-        --bg-header-hover: #3d3d3d;
-        --text-main: #ffffff;
-        --text-muted: #adb5bd;
-        --border-color: #404040;
-        --tag-bg: #0d47a1;
-        --tag-color: #e3f2fd;
-        --input-bg: #2d2d2d;
-        --input-text: #ffffff;
-        --input-border: #404040;
-        --match-bg: rgba(255, 200, 50, 0.15); /* subtler for dark */
-        --match-glow: rgba(255, 200, 50, 0.12);
-    }
-
     body {
         background-color: var(--bg-main);
         color: var(--text-main);
@@ -46,7 +29,7 @@
         margin-bottom: 2rem;
     }
 
-    .professor-tag {
+    .instructor-tag {
         display: inline-block;
         margin: 0.2rem;
         padding: 0.25rem 0.5rem;
@@ -59,13 +42,13 @@
     }
 
     /* Slight fill on hover to indicate interactiveness */
-    .professor-tag:hover {
+    .instructor-tag:hover {
         /* subtle tint on hover using the tag color */
         background-color: rgba(13, 71, 161, 0.06);
     }
 
     /* Use the same search-match wrapper inside tags so matched substrings are highlighted */
-    .professor-tag .search-match,
+    .instructor-tag .search-match,
     .search-match {
         background-color: var(--match-bg);
         padding: 0 0.12rem;
@@ -138,38 +121,21 @@
         font-size: 1.2rem;
         margin-right: 0.5rem;
     }
-
-    [data-theme="dark"] .form-control {
-        background-color: var(--input-bg);
-        border-color: var(--input-border);
-        color: var(--input-text);
-    }
-
-    [data-theme="dark"] .form-control:focus {
-        background-color: var(--input-bg);
-        border-color: var(--primary);
-        color: var(--input-text);
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    }
-
-    [data-theme="dark"] .form-control::placeholder {
-        color: var(--text-muted);
-    }
 </style>
 
 <div class="container my-3">
     <div id="controls" class="row mb-4">
         <div class="col-md-4">
             <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="showNoProfs">
-                <label class="form-check-label" for="showNoProfs">
+                <input class="form-check-input" type="checkbox" id="showInstructorless">
+                <label class="form-check-label" for="showInstructorless">
                     <i class="fas fa-users-slash"></i>
                 </label>
             </div>
         </div>
         <div class="col-md-4">
             <div class="input-group">
-                <input type="text" class="form-control" id="profSearch" placeholder="Search">
+                <input type="text" class="form-control" id="instructorSearch" placeholder="Search">
                 <button class="btn btn-outline-secondary" type="button" id="clearSearch">
                     <i class="fas fa-times"></i>
                 </button>
@@ -182,14 +148,14 @@
                     <i class="fas fa-sun mode-icon"></i>
                 </label>
             </div>
-            <button class="btn btn-outline-primary" type="button" onclick="BBN.closeBrowser()">
+            <button class="btn btn-outline-primary" type="button" onclick="document.getElementById('course-browser').style.display='none'">
                 <i class="fas fa-xmark"></i>
             </button>
         </div>
     </div>
     <div class="container mb-4 d-flex">
         <div class="flex-grow-1">
-            <button class="btn btn-sm btn-outline-primary" id="refresh-courses" onclick="BBN.refreshCourses()">Refresh</button>
+            <button class="btn btn-sm btn-outline-primary" id="refresh-courses" onclick="downloadCourses()">Refresh</button>
             <span class="text-muted pl-4" id="courses-status"></span>
         </div>
         <div id="term"></div>
@@ -200,92 +166,73 @@
 </div>
 
 <script>
-    let coursesData = [];
-    let currentProfSearch = '';
+    let currentInstructorSearch = '';
     const courseContainer = document.getElementById('courseContainer');
-    const showNoProfsToggle = document.getElementById('showNoProfs');
+    const showInstructorless = document.getElementById('showInstructorless');
     const darkModeToggle = document.getElementById('darkMode');
-    const profSearchInput = document.getElementById('profSearch');
+    const instructorSearchInput = document.getElementById('instructorSearch');
     const clearSearchBtn = document.getElementById('clearSearch');
 
-    // Cookie management
-    function setCookie(name, value, days) {
-        const d = new Date();
-        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-        document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/`;
+    // Download new course data
+    async function downloadCourses() {
+        const button = document.getElementById('refresh-courses');
+        const status = document.getElementById('courses-status');
+        button.setAttribute('disabled', true);
+        await BBN.refreshCourses((message) => {
+            status.innerText = `${message.step}...`;
+            if (message.total > 1) status.innerText += ` (${message.current}/${message.total})`;
+        });
+        await loadCourses();
+        button.setAttribute('disabled', false);
     }
-
-    function getCookie(name) {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            const [cookieName, cookieValue] = cookie.split('=').map(c => c.trim());
-            if (cookieName === name) return cookieValue;
-        }
-        return null;
-    }
-
-    // Dark mode management
-    function initializeTheme() {
-        const storedTheme = getCookie('theme');
-        if (storedTheme) {
-            setTheme(storedTheme === 'dark');
-        } else {
-            // Use system preference if no cookie
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            setTheme(prefersDark);
-        }
-    }
-
-    function setTheme(isDark) {
-        // TODO: document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        darkModeToggle.checked = isDark;
-        darkModeToggle.nextElementSibling.querySelector('i').className = 
-            `fas ${isDark ? 'fa-moon' : 'fa-sun'} mode-icon`;
-        setCookie('theme', isDark ? 'dark' : 'light', 365);
-    }
-
-    // Listen for system theme changes
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        if (!getCookie('theme')) { // Only auto-switch if user hasn't set preference
-            setTheme(e.matches);
-        }
-    });
-
-    darkModeToggle.addEventListener('change', (e) => {
-        setTheme(e.target.checked);
-    });
 
     // Load and process the course data
     async function loadCourses() {
-        BBN.log('Loading courses...');
+        BBN.log('Preparing data for display...');
         try {
             document.getElementById('term').innerText = BBN.term.name;
-            coursesData = await BBN.GM.getValue('courses', []);
-            document.getElementById('courses-status').innerText = await BBN.refreshedCoursesAt();
-            displayCourses(false);
+            document.getElementById('courses-status').innerText = prettyTime(BBN.updated);
+            renderCourses(false);
         } catch (error) {
             console.error('Error loading courses:', error);
             courseContainer.innerHTML = '<div class="alert alert-danger">Error loading course data</div>';
         }
     }
 
+    // Pretty time
+    function prettyTime(date) {
+        const then = new Date(date);
+        const now = new Date();
+        const diff = Math.floor((now - then) / 1000);
+        let timeAgo = '';
+        const s = (number) => number === 1 ? '' : 's';
+        if (diff < 10) timeAgo = 'just now';
+        else if (diff < 60) timeAgo = `${diff} second${s(diff)} ago`;
+        else if (diff < 3600) timeAgo = `${Math.floor(diff / 60)} minute${s(Math.floor(diff / 60))} ago`;
+        else if (diff < 86400) timeAgo = `${Math.floor(diff / 3600)} hour${s(Math.floor(diff / 3600))} ago`;
+        else if (diff < 2592000) timeAgo = `${Math.floor(diff / 86400)} day${s(Math.floor(diff / 86400))} ago`;
+        else if (diff < 31536000) timeAgo = `${Math.floor(diff / 2592000)} month${s(Math.floor(diff / 2592000))} ago`;
+        else timeAgo = `${Math.floor(diff / 31536000)} year${s(Math.floor(diff / 31536000))} ago`;
+        return `as of ${timeAgo}`;
+    }
+
     // Group courses by department and display them
     function shouldShowCourse(course) {
-        const hasProfs = course.professors && course.professors.length > 0;
-        if (!currentProfSearch) {
-            return showNoProfsToggle.checked || hasProfs;
+        const instructors = getInstructors(course);
+        if (!currentInstructorSearch) {
+            return showInstructorless.checked || instructors.length > 0;
         }
 
-        const q = currentProfSearch.toLowerCase();
-        const profMatch = hasProfs && course.professors.some(prof => prof.toLowerCase().includes(q));
+        const q = currentInstructorSearch.toLowerCase();
+        const instructorMatch = instructors.some(instructor => instructor.toLowerCase().includes(q));
         const titleMatch = course.title && course.title.toLowerCase().includes(q);
         const codeMatch = course.cd && course.cd.toLowerCase().includes(q);
 
-        const matchesSearch = profMatch || titleMatch || codeMatch;
-        return (showNoProfsToggle.checked || hasProfs) && matchesSearch;
+        const matchesSearch = instructorMatch || titleMatch || codeMatch;
+        return (showInstructorless.checked || instructors.length > 0) && matchesSearch;
     }
 
-    function displayCourses(expandAll) {
+    function renderCourses(expandAll) {
         // First, destroy any existing collapses
         document.querySelectorAll('.courses-list.collapse').forEach(el => {
             const collapse = new mdb.Collapse(el, { toggle: false });
@@ -293,7 +240,7 @@
         });
 
         // Group by department
-        const deptGroups = coursesData.reduce((groups, course) => {
+        const deptGroups = BBN.courses.reduce((groups, course) => {
             const dept = course.dept || 'Unknown Department';
             if (!groups[dept]) {
                 groups[dept] = [];
@@ -387,31 +334,32 @@
         const card = document.createElement('div');
         card.className = 'card course-card';
         
-        let professors = '<em class="text-muted">No professors listed</em>';
-        if (course.professors && course.professors.length > 0) {
-            if (currentProfSearch) {
+        let text = '<em class="text-muted">No instructors listed</em>';
+        const instructors = getInstructors(course);
+        if (instructors.length > 0) {
+            if (currentInstructorSearch) {
                 try {
-                    const q = escapeRegExp(currentProfSearch);
+                    const q = escapeRegExp(currentInstructorSearch);
                     const re = new RegExp(q, 'gi');
-                    professors = course.professors.map(prof => {
-                        const profHighlighted = prof.replace(re, match => `<span class="search-match">${match}</span>`);
-                        return `<span class="professor-tag">${profHighlighted}</span>`;
+                    text = instructors.map(instructor => {
+                        const highlight = instructor.replace(re, match => `<span class="search-match">${match}</span>`);
+                        return `<span class="instructor-tag">${highlight}</span>`;
                     }).join('');
                 } catch (e) {
                     // fallback to plain rendering if regex fails
-                    professors = course.professors.map(prof => `<span class="professor-tag">${prof}</span>`).join('');
+                    text = instructors.map(instructor => `<span class="instructor-tag">${instructor}</span>`).join('');
                 }
             } else {
-                professors = course.professors.map(prof => `<span class="professor-tag">${prof}</span>`).join('');
+                text = instructors.map(instructor => `<span class="instructor-tag">${instructor}</span>`).join('');
             }
         }
 
         // Highlight matches in title and code
         let displayTitle = course.title || '';
         let displayCode = course.cd || '';
-        if (currentProfSearch) {
+        if (currentInstructorSearch) {
             try {
-                const q = escapeRegExp(currentProfSearch);
+                const q = escapeRegExp(currentInstructorSearch);
                 const re = new RegExp(q, 'gi');
                 displayTitle = displayTitle.replace(re, match => `<span class="search-match">${match}</span>`);
                 displayCode = displayCode.replace(re, match => `<span class="search-match">${match}</span>`);
@@ -425,17 +373,17 @@
             <div class="card-body">
                 <h5 class="card-title">${displayCode} - ${displayTitle}</h5>
                 <p class="card-text">${course.desc || 'No description available'}</p>
-                <div class="professors mt-2">
-                    ${professors}
+                <div class="instructors mt-2">
+                    ${text}
                 </div>
             </div>
         `;
         return card;
     }
 
-    // Handle toggle for showing courses without professors
-    showNoProfsToggle.addEventListener('change', () => {
-        displayCourses(currentProfSearch !== '');
+    // Handle toggle for showing courses without instructors
+    showInstructorless.addEventListener('change', () => {
+        renderCourses(currentInstructorSearch !== '');
     });
 
     // Helper function to expand/collapse all sections
@@ -458,7 +406,7 @@
     // Handle showing/hiding courses in a section
     function updateSection(section) {
         document.querySelectorAll('.dept-section').forEach(section => {
-            const courses = coursesData.filter(course => course.dept === section.querySelector('h2').textContent);
+            const courses = BBN.courses.filter(course => course.dept === section.querySelector('h2').textContent);
             const visibleCourses = courses.filter(shouldShowCourse);
             
             // Update course count
@@ -509,20 +457,28 @@
         }
     });
 
-    // Handle professor name search
-    function handleProfSearch() {
-        currentProfSearch = profSearchInput.value.trim();
-        displayCourses(currentProfSearch !== '');
+    // Get instructor list for course
+    function getInstructors(course) {
+        const instructors = [];
+        for (const section of course.sections)
+            if (!instructors.includes(section.instructor_name))
+                instructors.push(section.instructor_name);
+        return instructors;
+    }
+
+    // Handle instructor name search
+    function handleInstructorSearch() {
+        currentInstructorSearch = instructorSearchInput.value.trim();
+        renderCourses(currentInstructorSearch !== '');
     }
 
     // Set up search handlers
-    profSearchInput.addEventListener('input', handleProfSearch);
+    instructorSearchInput.addEventListener('input', handleInstructorSearch);
     clearSearchBtn.addEventListener('click', () => {
-        profSearchInput.value = '';
-        handleProfSearch();
+        instructorSearchInput.value = '';
+        handleInstructorSearch();
     });
 
-    // Initialize theme and load courses
-    initializeTheme();
+    // Start
     loadCourses();
 </script>
